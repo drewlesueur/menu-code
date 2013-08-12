@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1"> 
+<script src="underscore-min.js"></script>
+<script src="zepto.min.js"></script>
+<script src="async.js"></script>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    font-family: Helvetica;
+    font-weight: bold;
+  }
+  
+  .scroll {
+    -webkit-overflow-scrolling: touch;
+    overflow: scroll;
+  }
+  .list_item {
+    width: 320px;
+    border-bottom: 1px solid lightgray;
+  }
+  .list_item_input {
+    width: 320px;
+    border: none;
+    font-size: 20px;
+    padding: 10px;
+  }
+  .title {
+    width: 320px;
+    border: none;
+    font-size: 20px;
+  }
+  #top_bar {
+    background-color: black;
+    color: white;
+    width: 320px;
+    padding: 10px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div>
+  <div id="top_bar">
+  </div>
+  </div>
+  <div id="list" class="scroll">
+  </div>
+  <div id="bottom_bar">
+  </div>
+</div>
+
+<script id="top_bar_template" type="text/html">
+  <span><%= back %></span>
+  <span class="title"><%= title %></span>
+  <span></span>
+</script>
+<script id="list_template" type="text/html">
+  <% _.each(items, function (item, index) { %>
+    <div 
+      class="list_item"
+      onclick="window.location='#<%= path %><%= path.length ? "," : "" %><%= index %>'">
+      <input 
+        class="list_item_input"
+        readonly type="text" 
+        onclick_old="step_in(<%= index %>)"
+        value="<%= to_one_line(item) %>"/>
+      <!--<span > &gt; </span>-->
+    </div>
+  <% }) %>
+</script>
+<script>
+
+var list_template = _.template($("#list_template").html())
+var top_bar_template = _.template($("#top_bar_template").html())
+
+var code = ["html", ["body", ["div", "hello world"]]]
+
+var to_one_line = function (item) {
+  // TODO: maybe only support a few levels for speed :)
+  if (_.isArray(item)) {
+    var line = _.map(item, function (sub_item) {
+      return to_one_line(sub_item);
+    }).join(" ")
+    return "(" + line + ")"
+  } else {
+    return item
+  }
+}
+
+var render = function (state) {
+  $("#top_bar").html(top_bar_template(state)) 
+  $("#list").html(list_template(state)) 
+}
+
+var state = {
+  path: [],
+  items: code,
+  root: code,
+  title: "A title",
+  back: "",
+  stack: []
+}
+
+render(state)
+
+var handle_hash_change = function () {
+  console.log(location.hash)
+  var path = _.compact(location.hash.substring(1).split(","))
+  if (!path.length) {
+    state.items = state.root;
+  }
+  state.items = _.reduce(path, function (items, index, index_index) {
+    return items[index] 
+  }, state.root)
+  state.path = path;
+  render(state)
+
+}
+
+window.onhashchange = handle_hash_change
+window.onload = handle_hash_change
+
+
+var step_in = function (index) {
+  state.stack.push[state.items]
+  state.items = state.items[index]
+  render(state)
+}
+</script>
+</body>
+</html>
