@@ -12,14 +12,7 @@
     font-family: Helvetica;
     font-weight: bold;
     box-sizing: border-box;
-
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: moz-none;
-    -ms-user-select: none;
-    user-select: none;
-
+  -webkit-tap-highlight-color:transparent;
   }
   
   .scroll {
@@ -84,25 +77,42 @@
   <% _.each(items, function (item, index) { %>
     <div 
       class="list_item"
-      yo_ontouchend="on_item_click('#<%= path %><%= path.length ? "," : "" %><%= index %>', <%= index %>)"
-      yo_onclick="on_item_click('#<%= path %><%= path.length ? "," : "" %><%= index %>', <%= index %>)"
-      old_click="window.location='#<%= path %><%= path.length ? "," : "" %><%= index %>'">
+      ontouchstart="on_item_click(event, '#<%= path %><%= path.length ? "," : "" %><%= index %>', <%= index %>)"
+      onmousedown="event.stopPropagation(); return false"
+      yo-onclick="on_item_click(event, '#<%= path %><%= path.length ? "," : "" %><%= index %>', <%= index %>)"
+      >
       <input 
         class="list_item_input"
         id="input_<%= index %>"
         type="text" 
-        onclick_old="step_in(<%= index %>)"
+        <%= _.isString(item) ? "" : "readonly" %>
+        onkeyup="on_input_keydown(event, <%= index %>)"
         value="<%= to_one_line(item) %>"/>
       <!--<span > &gt; </span>-->
     </div>
   <% }) %>
+    <div 
+      class="list_item"
+      >
+      <input 
+        class="list_item_input"
+        id="input_<%= items.length %>"
+        type="text" 
+        placeholder="new"
+        onkeyup="on_input_keydown(event, <%= items.length %>)"
+        />
+    </div>
 </script>
 <script>
 
 var list_template = _.template($("#list_template").html())
 var top_bar_template = _.template($("#top_bar_template").html())
 
-var code = ["html", ["body", ["div", "hello world"]]]
+if (localStorage.code) {
+  var code = JSON.parse(localStorage.code)
+} else {
+  var code = ["html", ["body", ["div", "hello world"]]]
+}
 
 var to_one_line = function (item) {
   // TODO: maybe only support a few levels for speed :)
@@ -145,7 +155,9 @@ var handle_hash_change = function (hash) {
   if (!path.length) {
     state.items = state.root;
   }
+  state.stack = []
   state.items = _.reduce(path, function (items, index, index_index) {
+    state.stack.push(items)
     return items[index] 
   }, state.root)
   state.path = path;
@@ -153,18 +165,25 @@ var handle_hash_change = function (hash) {
 }
 
 var touch_timeout = null
-var on_item_click = function (hash, index) {
-    if (has_moved) return;
-    if (_.isString(state.items[index])) {
-      $("#input_" + index).attr("readonly", null) 
-      return true;
+var on_item_click = function (event, hash, index) {
+    if (!_.isString(state.items[index])) {
+      event.preventDefault()
+      event.stopPropagation()
     }
-  //touch_timeout = setTimeout(function () {
+    //if (has_moved) return;
+  touch_timeout = setTimeout(function () {
+    if (_.isString(state.items[index])) {
+      $("#input_" + index).focus().select()
+      return true;
+    } else {
+    }
     listen_for_hash = false
     handle_hash_change(hash)
     window.location = hash
     listen_for_hash = true
-  //}, 50) 
+  }, 100) 
+    
+    return false
 }
 
 var has_moved = false
@@ -182,12 +201,53 @@ window.ontouchmove = function () {
 window.onhashchange = handle_hash_change_raw
 window.onload = handle_hash_change_raw
 
-
-var step_in = function (index) {
-  state.stack.push[state.items]
-  state.items = state.items[index]
-  render(state)
+var on_input_keydown = function (event, index) {
+  var val = $("#input_" + index).val()
+  if (event.which == 13) {
+    if (val == "") {
+      $("#input_" + (index)).focus()
+      state.items.splice(index, 1)
+      if (state.items.length == 0) {
+        // go back
+        var parentIndex = _.last(state.path)
+        var parentItems = state.stack[state.stack.length - 1]
+        parentItems[parentIndex - 0] = "--"
+        window.location = "#" + state.path.slice(0, -1).join(",")
+      }
+      save()
+    } else {
+      if (index < state.items.length - 1) {
+        state.items.splice(index + 1, 0, "")
+        save()
+      }
+    }
+    render(state)
+    setTimeout(function () {
+      try {
+      $("#input_" + (index + 1))[0].focus()
+      } catch (e) {}
+    }, 100)
+  } else {
+    state.items[index] = val
+    save()
+    if (val == "()") {
+      state.items[index] = [""]
+      save()
+      window.location = "#" + state.path.concat(index).join(",")
+      render(state)
+      setTimeout(function () {
+        $("#input_0")[0].focus()
+      }, 100)
+    }
+  }
 }
+
+var save = function () {
+  localStorage.code = JSON.stringify(state.root)
+}
+
+
+
 </script>
 </body>
 </html>
