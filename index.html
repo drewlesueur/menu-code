@@ -11,6 +11,15 @@
     padding: 0;
     font-family: Helvetica;
     font-weight: bold;
+    box-sizing: border-box;
+
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: moz-none;
+    -ms-user-select: none;
+    user-select: none;
+
   }
   
   .scroll {
@@ -27,18 +36,33 @@
     font-size: 20px;
     padding: 10px;
   }
-  .title {
-    width: 320px;
-    border: none;
+
+  .back {
+    background-color: gray;
+    display: inline-block;
+    padding: 10px;
+    width: 55px;
     font-size: 20px;
   }
-  #top_bar {
-    background-color: black;
-    color: white;
-    width: 320px;
+
+  .edit {
+    background-color: gray;
+    display: inline-block;
     padding: 10px;
-    text-align: center;
+    width: 55px;
+    font-size: 20px;
   }
+
+  .title {
+    background-color: black;
+    display: inline-block;
+    padding: 10px;
+    color: white;
+    width: 210px;
+    text-align: center;
+    font-size: 20px;
+  }
+
 </style>
 </head>
 <body>
@@ -54,18 +78,19 @@
 </div>
 
 <script id="top_bar_template" type="text/html">
-  <span><%= back %></span>
-  <span class="title"><%= title %></span>
-  <span></span>
+  <div class="back">back</div><div class="title"><%= title %></div><div class="edit">edit</div>
 </script>
 <script id="list_template" type="text/html">
   <% _.each(items, function (item, index) { %>
     <div 
       class="list_item"
-      onclick="window.location='#<%= path %><%= path.length ? "," : "" %><%= index %>'">
+      yo_ontouchend="on_item_click('#<%= path %><%= path.length ? "," : "" %><%= index %>', <%= index %>)"
+      yo_onclick="on_item_click('#<%= path %><%= path.length ? "," : "" %><%= index %>', <%= index %>)"
+      old_click="window.location='#<%= path %><%= path.length ? "," : "" %><%= index %>'">
       <input 
         class="list_item_input"
-        readonly type="text" 
+        id="input_<%= index %>"
+        type="text" 
         onclick_old="step_in(<%= index %>)"
         value="<%= to_one_line(item) %>"/>
       <!--<span > &gt; </span>-->
@@ -107,9 +132,16 @@ var state = {
 
 render(state)
 
-var handle_hash_change = function () {
-  console.log(location.hash)
-  var path = _.compact(location.hash.substring(1).split(","))
+var listen_for_hash = true
+
+var handle_hash_change_raw = function () {
+  if (listen_for_hash) {
+    handle_hash_change(location.hash)
+  }
+}
+
+var handle_hash_change = function (hash) {
+  var path = _.compact(hash.substring(1).split(","))
   if (!path.length) {
     state.items = state.root;
   }
@@ -118,11 +150,37 @@ var handle_hash_change = function () {
   }, state.root)
   state.path = path;
   render(state)
-
 }
 
-window.onhashchange = handle_hash_change
-window.onload = handle_hash_change
+var touch_timeout = null
+var on_item_click = function (hash, index) {
+    if (has_moved) return;
+    if (_.isString(state.items[index])) {
+      $("#input_" + index).attr("readonly", null) 
+      return true;
+    }
+  //touch_timeout = setTimeout(function () {
+    listen_for_hash = false
+    handle_hash_change(hash)
+    window.location = hash
+    listen_for_hash = true
+  //}, 50) 
+}
+
+var has_moved = false
+window.ontouchstart = function () {
+  has_moved = false 
+  return true;
+}
+
+window.ontouchmove = function () {
+  clearTimeout(touch_timeout)
+  has_moved = true;
+  return true;
+}
+
+window.onhashchange = handle_hash_change_raw
+window.onload = handle_hash_change_raw
 
 
 var step_in = function (index) {
