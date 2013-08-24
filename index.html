@@ -14,6 +14,7 @@
     font-weight: bold;
     box-sizing: border-box;
     -webkit-tap-highlight-color:transparent;
+    -webkit-backface-visibility: hidden;
   }
   
   .scroll {
@@ -92,11 +93,20 @@
 <span onclick="unwrap()">unwrap</span>
 </script>
 
+
+<script id="list_item_value_template" type="text/html">
+  {{value}}
+</script>
+
+<script id="list_item_template" type="text/html">
+  <div class="list_item" ontouchend="on_click_item({{index}})" id="item_{{index}}">
+    {{> list_item_value}}
+  </div>
+</script>
+
 <script id="list_template" type="text/html">
   {{#to_stringed_current_items}}
-  <div class="list_item" ontouchend="on_click_item({{index}})">
-    {{value}}
-  </div>
+  {{> list_item}}
   {{/to_stringed_current_items}}
   <div class="list_item gray" ontouchend="add_new()">
     new
@@ -111,6 +121,8 @@ var moved = function () {
 var body_touch_end = function () {
   state.moved = false
 }
+var list_item_template = Mustache.compilePartial('list_item', $("#list_item_template").html())
+var list_item_value_template = Mustache.compilePartial('list_item_value', $("#list_item_value_template").html())
 var list_template = Mustache.compile($("#list_template").html())
 var top_bar_template = Mustache.compile($("#top_bar_template").html())
 
@@ -151,8 +163,9 @@ var on_click_item = function (i) {
       var n = prompt("?", state.current_items[i])
       if (!_.isNull(n)) {
         state.current_items[i] = (n) 
+        state.to_stringed_current_items[i] = to_stringed_one_item(state.current_items[i], i)
+        render_item(i)
       }
-      render(state)
     })
     
   } else {
@@ -183,13 +196,18 @@ var add_new = function ( ){
   })
 }
 
-var render = function (state) {
-  state.to_stringed_current_items = _.map(state.current_items, function (v, i) {
+var to_stringed_one_item = function (v, i) {
     return {index: i, value: to_one_line(v)}
-  })
+}
+var render = function (state) {
+  state.to_stringed_current_items = _.map(state.current_items, to_stringed_one_item)
   state.is_len_1 = _.isArray(state.current_items) && state.current_items.length == 1
   $("#top_bar").html(top_bar_template(state)) 
   $("#list").html(list_template(state)) 
+}
+
+var render_item = function (i) {
+  $("#item_" + i).html(list_item_value_template(state.to_stringed_current_items[i])) 
 }
 
 var state = {
