@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"> 
 <script src="underscore-min.js"></script>
 <script src="zepto.min.js"></script>
+<script src="mustache.js"></script>
 <script src="async.js"></script>
 <style>
   * {
@@ -12,7 +13,7 @@
     font-family: Helvetica;
     font-weight: bold;
     box-sizing: border-box;
-  -webkit-tap-highlight-color:transparent;
+    -webkit-tap-highlight-color:transparent;
   }
   
   .scroll {
@@ -22,13 +23,14 @@
   .list_item {
     width: 320px;
     border-bottom: 1px solid lightgray;
-  }
-  .list_item_input {
-    width: 320px;
-    border: none;
     font-size: 20px;
     padding: 10px;
   }
+
+  #list {
+    height: 300px;
+  }
+
 
   .back {
     background-color: gray;
@@ -56,13 +58,14 @@
     font-size: 20px;
   }
 
+  .gray { color: gray;}
+
 </style>
 </head>
-<body>
+<body ontouchmove="moved()" ontouchend="body_touch_end()">
 
 <div>
-  <div id="top_bar">
-  </div>
+  <div id="top_bar" class="scroll title" style="white-space: nowrap; width: 100%">
   </div>
   <div id="list" class="scroll">
   </div>
@@ -71,48 +74,49 @@
 </div>
 
 <script id="top_bar_template" type="text/html">
-  <div class="back">back</div><div class="title"><%= title %></div><div class="edit">edit</div>
+<span ontouchend="on_click_back()">Back</span>
+<span onclick="wrap()">wrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
+<span onclick="unwrap()">unwrap</span>
 </script>
+
 <script id="list_template" type="text/html">
-  <% _.each(items, function (item, index) { %>
-    <div 
-      class="list_item"
-      ontouchstart="on_item_click(event, '#<%= path %><%= path.length ? "," : "" %><%= index %>', <%= index %>)"
-      onmousedown="event.stopPropagation(); return false"
-      yo-onclick="on_item_click(event, '#<%= path %><%= path.length ? "," : "" %><%= index %>', <%= index %>)"
-      >
-      <input 
-        class="list_item_input"
-        id="input_<%= index %>"
-        type="text" 
-        <%= _.isString(item) ? "" : "readonly" %>
-        onkeyup="on_input_keydown(event, <%= index %>)"
-        value="<%= to_one_line(item) %>"/>
-      <!--<span > &gt; </span>-->
-    </div>
-  <% }) %>
-    <div 
-      class="list_item"
-      >
-      <input 
-        class="list_item_input"
-        id="input_<%= items.length %>"
-        type="text" 
-        placeholder="new"
-        onkeyup="on_input_keydown(event, <%= items.length %>)"
-        />
-    </div>
+  {{#to_stringed_current_items}}
+  <div class="list_item" ontouchend="on_click_item({{index}})">
+    {{value}}
+  </div>
+  {{/to_stringed_current_items}}
+  <div class="list_item gray" ontouchend="add_new()">
+    new
+  </div>
 </script>
 <script>
 
-var list_template = _.template($("#list_template").html())
-var top_bar_template = _.template($("#top_bar_template").html())
-
-if (localStorage.code) {
-  var code = JSON.parse(localStorage.code)
-} else {
-  var code = ["html", ["body", ["div", "hello world"]]]
+var moved = function () {
+  state.moved = true
 }
+
+var body_touch_end = function () {
+  state.moved = false
+}
+var list_template = Mustache.compile($("#list_template").html())
+var top_bar_template = Mustache.compile($("#top_bar_template").html())
+
+var code = ["html", ["body", ["div", "hello world"]]]
+
+_.times(100, function (n) {
+  code.push(n)
+})
+
 
 var to_one_line = function (item) {
   // TODO: maybe only support a few levels for speed :)
@@ -126,126 +130,74 @@ var to_one_line = function (item) {
   }
 }
 
+var unwrap = function () {
+  var i = state.current_index
+  state.current_items = state.stack.pop()
+  state.current_index = state.index_stack.pop()
+  state.current_items[i] = state.current_items[i][0]
+  render(state)
+}
+
+var on_click_item = function (i) {
+  if (state.moved) return
+  if (!_.isArray(state.current_items[i])) {
+    //state.current_items = [state.current_items[i]]
+    //state.current_items[i] = [state.current_items[i]] 
+
+    _.defer(function () {
+      var n = prompt("?", state.current_items[i])
+      if (!_.isNull(n)) {
+        state.current_items[i] = (n) 
+      }
+      render(state)
+    })
+    
+  } else {
+    state.stack.push(state.current_items)
+    state.index_stack.push(state.current_index)
+
+    state.current_index = i
+    state.current_items = state.current_items[i] 
+    render(state)
+  }
+}
+
+var on_click_back = function () {
+  if (state.stack.length) {
+    state.current_items = state.stack.pop()
+    state.current_index = state.index_stack.pop()
+    render(state)
+  }
+}
+
+var add_new = function ( ){
+  var n = prompt("?")
+  _.defer(function () {
+    if (!_.isNull(n)) {
+      state.current_items.push(n) 
+    }
+    render(state)
+  })
+}
+
 var render = function (state) {
+  state.to_stringed_current_items = _.map(state.current_items, function (v, i) {
+    return {index: i, value: to_one_line(v)}
+  })
+  state.is_len_1 = _.isArray(state.current_items) && state.current_items.length == 1
   $("#top_bar").html(top_bar_template(state)) 
   $("#list").html(list_template(state)) 
 }
 
 var state = {
-  path: [],
-  items: code,
-  root: code,
-  title: "A title",
-  back: "",
-  stack: []
+  code: code,
+  current_items: code,
+  to_stringed_current_items: [],
+  stack: [],
+  index_stack: []
 }
 
 render(state)
-
-var listen_for_hash = true
-
-var handle_hash_change_raw = function () {
-  if (listen_for_hash) {
-    handle_hash_change(location.hash)
-  }
-}
-
-var handle_hash_change = function (hash) {
-  var path = _.compact(hash.substring(1).split(","))
-  if (!path.length) {
-    state.items = state.root;
-  }
-  state.stack = []
-  state.items = _.reduce(path, function (items, index, index_index) {
-    state.stack.push(items)
-    return items[index] 
-  }, state.root)
-  state.path = path;
-  render(state)
-}
-
-var touch_timeout = null
-var on_item_click = function (event, hash, index) {
-    if (!_.isString(state.items[index])) {
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    //if (has_moved) return;
-  touch_timeout = setTimeout(function () {
-    if (_.isString(state.items[index])) {
-      $("#input_" + index).focus().select()
-      return true;
-    } else {
-    }
-    listen_for_hash = false
-    handle_hash_change(hash)
-    window.location = hash
-    listen_for_hash = true
-  }, 100) 
-    
-    return false
-}
-
-var has_moved = false
-window.ontouchstart = function () {
-  has_moved = false 
-  return true;
-}
-
-window.ontouchmove = function () {
-  clearTimeout(touch_timeout)
-  has_moved = true;
-  return true;
-}
-
-window.onhashchange = handle_hash_change_raw
-window.onload = handle_hash_change_raw
-
-var on_input_keydown = function (event, index) {
-  var val = $("#input_" + index).val()
-  if (event.which == 13) {
-    if (val == "") {
-      $("#input_" + (index)).focus()
-      state.items.splice(index, 1)
-      if (state.items.length == 0) {
-        // go back
-        var parentIndex = _.last(state.path)
-        var parentItems = state.stack[state.stack.length - 1]
-        parentItems[parentIndex - 0] = "--"
-        window.location = "#" + state.path.slice(0, -1).join(",")
-      }
-      save()
-    } else {
-      if (index < state.items.length - 1) {
-        state.items.splice(index + 1, 0, "")
-        save()
-      }
-    }
-    render(state)
-    setTimeout(function () {
-      try {
-      $("#input_" + (index + 1))[0].focus()
-      } catch (e) {}
-    }, 100)
-  } else {
-    state.items[index] = val
-    save()
-    if (val == "()") {
-      state.items[index] = [""]
-      save()
-      window.location = "#" + state.path.concat(index).join(",")
-      render(state)
-      setTimeout(function () {
-        $("#input_0")[0].focus()
-      }, 100)
-    }
-  }
-}
-
-var save = function () {
-  localStorage.code = JSON.stringify(state.root)
-}
-
 
 
 </script>
