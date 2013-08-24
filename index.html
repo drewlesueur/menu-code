@@ -25,6 +25,9 @@
     border-bottom: 1px solid lightgray;
     font-size: 20px;
     padding: 10px;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    overflow: scroll;
   }
 
   #list {
@@ -111,7 +114,7 @@ var body_touch_end = function () {
 var list_template = Mustache.compile($("#list_template").html())
 var top_bar_template = Mustache.compile($("#top_bar_template").html())
 
-var code = ["html", ["body", ["div", "hello world"]]]
+var code = ["html", ["body", ["div", "hello world", "asjdhflkasjfkl  asfhlkasdhflaks akshdflaksdj falskhdf a"]]]
 
 _.times(100, function (n) {
   code.push(n)
