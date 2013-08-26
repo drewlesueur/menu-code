@@ -15,6 +15,7 @@
     box-sizing: border-box;
     -webkit-tap-highlight-color:transparent;
     -webkit-backface-visibility: hidden;
+     -webkit-transform: translate3d(0,0,0);  
   }
   
   .scroll {
@@ -36,22 +37,6 @@
   }
 
 
-  .back {
-    background-color: gray;
-    display: inline-block;
-    padding: 10px;
-    width: 55px;
-    font-size: 20px;
-  }
-
-  .edit {
-    background-color: gray;
-    display: inline-block;
-    padding: 10px;
-    width: 55px;
-    font-size: 20px;
-  }
-
   .title {
     background-color: black;
     display: inline-block;
@@ -63,6 +48,11 @@
   }
 
   .gray { color: gray;}
+
+  .action {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
 
 </style>
 </head>
@@ -78,19 +68,15 @@
 </div>
 
 <script id="top_bar_template" type="text/html">
-<span ontouchend="on_click_back()">Back</span>
-<span onclick="wrap()">wrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
-<span onclick="unwrap()">unwrap</span>
+<span class="action back" ontouchend="back()">back</span>
+<span class="action run" ontouchend="run()">run</span>
+<span class="action wrap" ontouchend="wrap()">wrap</span>
+<span class="action unwrap" ontouchend="unwrap()">unwrap</span>
+<span class="action cut" ontouchend="cut()">cut</span>
+<span class="action copy" ontouchend="copy()">copy</span>
+<span class="action paste" ontouchend="paste()">paste</span>
+<span class="action delete" ontouchend="del()">delete</span>
+<span class="action edit" ontouchend="edit()">edit</span>
 </script>
 
 
@@ -113,6 +99,39 @@
   </div>
 </script>
 <script>
+
+var wrap = function () {
+  state.click_action = "wrap"
+}
+
+var unwrap = function () {
+  state.click_action = "unwrap"
+}
+
+var run = function () {
+  //
+}
+
+var cut = function () {
+  state.click_action = "cut"
+}
+
+var copy = function () {
+  state.click_action = "copy"
+}
+
+var paste = function () {
+  state.click_action = "paste"
+}
+
+var del = function () {
+  state.click_action = "delete"
+}
+
+var edit = function () {
+  state.click_action = "edit"
+}
+
 
 var moved = function () {
   state.moved = true
@@ -188,19 +207,12 @@ var to_one_line = function (item) {
   }
 }
 
-var unwrap = function () {
-  var i = state.current_index
-  state.current_items = state.stack.pop()
-  state.current_index = state.index_stack.pop()
-  state.current_items[i] = state.current_items[i][0]
-  render(state)
-}
 
 var on_click_item = function (i) {
   state.clicked_index = i
 }
 
-var on_click_back = function () {
+var back = function () {
   if (state.stack.length) {
     state.current_items = state.stack.pop()
     state.current_index = state.index_stack.pop()
@@ -235,26 +247,9 @@ var render_item = function (i) {
   $("#item_" + i).html(list_item_value_template(state.to_stringed_current_items[i])) 
 }
 
-var ui_changes = {
-  current_items: function (state) {
-    render(state)
-  }
-}
 
-var state_changes = {
-  stringed_current_item: function (state, item) {
-    state.to_stringed_current_items[i] = to_stringed_one_item(item, i)
-  },
-  current_item: function (state, item) {
-    var i = state.current_index
-    state.current_items[i] = (n) 
-    state.stringed_current_item = to_stringed_one_item(item, i)
-  },
-  current_index: function (state) {
-    state.current_item = state.current_items[state.current_index]
-  },
-  clicked_index: function (state, i) {
-    if (state.moved) return
+var actions = {
+  pointer: function (state, i) {
     if (!_.isArray(state.current_items[i])) {
       state.current_index = i
       _.defer(function () {
@@ -263,7 +258,6 @@ var state_changes = {
           state.current_item = n
         }
       })
-      
     } else {
       state.stack.push(state.current_items)
       state.index_stack.push(state.current_index)
@@ -271,7 +265,59 @@ var state_changes = {
       state.current_index = i
       state.current_items = state.current_items[i] 
     }
+  },
+  wrap: function (state, i) {
+    state.current_index = i
+    state.current_item = [state.current_item]
+  }
+}
+
+var ui_changes = {
+  current_items: function (state) {
+    render(state)
+  },
+  action: function (state, action, old_action) {
+    $("#top_bar").html(top_bar_template(state)) 
+    $("." + old_action).css("color", "white")
+    $("." + action).css("color", "cyan")
+  },
+  current_item: function (state, current_item, old_current_item) {
+    if (current_item != old_current_item) {
+      render_item(state.current_index)
+    }
   } 
+}
+
+var state_changes = {
+  stringed_current_item: function (state, sci) {
+    var i = state.current_index
+    state.to_stringed_current_items[i] = sci
+  },
+  current_item: function (state, item) {
+    var i = state.current_index
+    state.current_items[i] = item
+    state.stringed_current_item = to_stringed_one_item(item, i)
+  },
+  current_index: function (state, i) {
+    state._current_item = state.current_items[state.current_index]
+    state._stringed_current_item = state.to_stringed_current_items[i]
+  },
+  clicked_index: function (state, i) {
+    if (state.moved) return
+    actions[state.action](state, i)
+    if (state.action != "pointer") {
+      state.action = "pointer"
+    }
+  },
+  click_action: function (state, click_action) {
+    if (state.moved) {
+      return
+    } else if (state.action == click_action) {
+      state.action = "pointer"
+    } else {
+      state.action = click_action
+    }
+  }
 }
 
 var state = watch_changes(ui_changes, state_changes, {
@@ -281,9 +327,14 @@ var state = watch_changes(ui_changes, state_changes, {
   stack: [],
   index_stack: [],
   clicked_index: null,
-   current_item: null,
-  stringed_current_item: null
+  current_item: null,
+  current_index: null,
+  stringed_current_item: null,
+  action: "pointer",
+  click_action: null
 })
+
+state.current_index = 0;
 
 render(state)
 
@@ -291,9 +342,9 @@ window.onscroll = function () {
   //alert("scroll")
 }
 
-scrollTo(0, 0)
+//scrollTo(0, 0)
 setTimeout(function () {
-  $("#list").css("height", innerHeight - $("#top_bar").height())
+  $("#list").css("height", (innerHeight - $("#top_bar").height() - 10) + "px")
 }, 200)
 </script>
 </body>
