@@ -32,7 +32,7 @@
   }
 
   #list {
-    height: 300px;
+    height: 700px;
   }
 
 
@@ -132,6 +132,49 @@ _.times(100, function (n) {
   code.push(n)
 })
 
+// TODO: finish/make compiler that compiles this for speed. (js_var_watch)
+var watch_changes = function (ioChanges, stateChanges, object) {
+    _.each(object, function (value, key) {
+      var inioChanges = (key in ioChanges) 
+      var instateChanges = (key in stateChanges) 
+      if (inioChanges || instateChanges) {
+        var get = function () { return object["_" + key] }
+        var set
+        if (inioChanges && !instateChanges) {
+          set = function (value) {
+            var oldValue = object["_" + key]
+            object["_" + key] = value
+            ioChanges[key](object, value, oldValue)
+            return value;
+          }
+        } else if (!inioChanges && instateChanges) {
+          set = function (value) {
+            var oldValue = object["_" + key]
+            object["_" + key] = value
+            stateChanges[key](object, value, oldValue)
+            return value;
+          }
+        } else if (inioChanges && instateChanges) {
+          set = function (value) {
+            var oldValue = object["_" + key]
+            object["_" + key] = value
+            stateChanges[key](object, value, oldValue)
+            ioChanges[key](object, value, oldValue)
+            return value;
+          }
+        }
+        value = object[key]
+        delete object[key]
+        object["_" + key] = value
+        Object.defineProperty(object, key, {
+          get: get,
+          set: set
+        })  
+      }
+    })  
+    return object;
+}
+
 
 var to_one_line = function (item) {
   // TODO: maybe only support a few levels for speed :)
@@ -154,28 +197,7 @@ var unwrap = function () {
 }
 
 var on_click_item = function (i) {
-  if (state.moved) return
-  if (!_.isArray(state.current_items[i])) {
-    //state.current_items = [state.current_items[i]]
-    //state.current_items[i] = [state.current_items[i]] 
-
-    _.defer(function () {
-      var n = prompt("?", state.current_items[i])
-      if (!_.isNull(n)) {
-        state.current_items[i] = (n) 
-        state.to_stringed_current_items[i] = to_stringed_one_item(state.current_items[i], i)
-        render_item(i)
-      }
-    })
-    
-  } else {
-    state.stack.push(state.current_items)
-    state.index_stack.push(state.current_index)
-
-    state.current_index = i
-    state.current_items = state.current_items[i] 
-    render(state)
-  }
+  state.clicked_index = i
 }
 
 var on_click_back = function () {
@@ -199,28 +221,80 @@ var add_new = function ( ){
 var to_stringed_one_item = function (v, i) {
     return {index: i, value: to_one_line(v)}
 }
+
 var render = function (state) {
+  var s = Date.now()
   state.to_stringed_current_items = _.map(state.current_items, to_stringed_one_item)
   state.is_len_1 = _.isArray(state.current_items) && state.current_items.length == 1
   $("#top_bar").html(top_bar_template(state)) 
   $("#list").html(list_template(state)) 
+  document.title = Date.now() - s
 }
 
 var render_item = function (i) {
   $("#item_" + i).html(list_item_value_template(state.to_stringed_current_items[i])) 
 }
 
-var state = {
+var ui_changes = {
+  current_items: function (state) {
+    render(state)
+  }
+}
+
+var state_changes = {
+  stringed_current_item: function (state, item) {
+    state.to_stringed_current_items[i] = to_stringed_one_item(item, i)
+  },
+  current_item: function (state, item) {
+    var i = state.current_index
+    state.current_items[i] = (n) 
+    state.stringed_current_item = to_stringed_one_item(item, i)
+  },
+  current_index: function (state) {
+    state.current_item = state.current_items[state.current_index]
+  },
+  clicked_index: function (state, i) {
+    if (state.moved) return
+    if (!_.isArray(state.current_items[i])) {
+      state.current_index = i
+      _.defer(function () {
+        var n = prompt("?", state.current_item)
+        if (!_.isNull(n)) {
+          state.current_item = n
+        }
+      })
+      
+    } else {
+      state.stack.push(state.current_items)
+      state.index_stack.push(state.current_index)
+
+      state.current_index = i
+      state.current_items = state.current_items[i] 
+    }
+  } 
+}
+
+var state = watch_changes(ui_changes, state_changes, {
   code: code,
   current_items: code,
   to_stringed_current_items: [],
   stack: [],
-  index_stack: []
-}
+  index_stack: [],
+  clicked_index: null,
+   current_item: null,
+  stringed_current_item: null
+})
 
 render(state)
 
+window.onscroll = function () {
+  //alert("scroll")
+}
 
+scrollTo(0, 0)
+setTimeout(function () {
+  $("#list").css("height", innerHeight - $("#top_bar").height())
+}, 200)
 </script>
 </body>
 </html>
