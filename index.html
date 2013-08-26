@@ -75,7 +75,7 @@
 <span class="action cut" ontouchend="cut()">cut</span>
 <span class="action copy" ontouchend="copy()">copy</span>
 <span class="action paste" ontouchend="paste()">paste</span>
-<span class="action delete" ontouchend="del()">delete</span>
+<span class="action del" ontouchend="del()">delete</span>
 <span class="action edit" ontouchend="edit()">edit</span>
 </script>
 
@@ -125,7 +125,7 @@ var paste = function () {
 }
 
 var del = function () {
-  state.click_action = "delete"
+  state.click_action = "del"
 }
 
 var edit = function () {
@@ -145,12 +145,15 @@ var list_item_value_template = Mustache.compilePartial('list_item_value', $("#li
 var list_template = Mustache.compile($("#list_template").html())
 var top_bar_template = Mustache.compile($("#top_bar_template").html())
 
-var code = ["html", ["body", ["div", "hello world", "asjdhflkasjfkl  asfhlkasdhflaks akshdflaksdj falskhdf a"]]]
+var code = ["html", ["body", ["div", "hello world", "asjdhflkasjfkl  asfhlkasdhflaks akshdflaksdj falskhdf a"]],
+
+["hi", "fun", "bye"]
+]
 
 _.times(100, function (n) {
   code.push(n)
 })
-
+// TODO: cache views, cache to_string_current_items
 // TODO: finish/make compiler that compiles this for speed. (js_var_watch)
 var watch_changes = function (ioChanges, stateChanges, object) {
     _.each(object, function (value, key) {
@@ -216,6 +219,10 @@ var back = function () {
   if (state.stack.length) {
     state.current_items = state.stack.pop()
     state.current_index = state.index_stack.pop()
+
+    state.parent_items = _.last(state.stack)
+    state.parent_index = _.last(state.index_stack)
+
     render(state)
   }
 }
@@ -259,6 +266,9 @@ var actions = {
         }
       })
     } else {
+      state.parent_items = state.current_items
+      state.parent_index = state.current_index
+
       state.stack.push(state.current_items)
       state.index_stack.push(state.current_index)
 
@@ -269,6 +279,24 @@ var actions = {
   wrap: function (state, i) {
     state.current_index = i
     state.current_item = [state.current_item]
+  },
+  unwrap: function (state, i){
+    state.current_index = i
+    if (!_.isArray(state.current_item)) return
+
+    state.insert = {
+      start: state.current_index,
+      length: 1,
+      values: state.current_item
+    }
+  },
+  del: function (state, i) {
+    state.current_index = i
+    state.insert = {
+      start: i,
+      length: 1,
+      values: []
+    }
   }
 }
 
@@ -282,25 +310,53 @@ var ui_changes = {
     $("." + action).css("color", "cyan")
   },
   current_item: function (state, current_item, old_current_item) {
-    if (current_item != old_current_item) {
+    if (current_item !== old_current_item) {
       render_item(state.current_index)
     }
+  },
+  insert: function (state, insert) {
+    render(state) 
+    //var start = insert.start
+    //var length = insert.length
+    //var values = insert.values
+    //
+    //for (var i = start; i < length; i++) { //>
+    //  $("#item_" + offset_i).remove()
+    //} 
+    //for (var i = 0; i < values.length; i++) { //>
+    //  var offset_i = i + start
+    //  $("#item_" + offset_i).after(list_item_template(state.to_stringed_current_items[offset_i]))
+    //}  
   } 
 }
 
+var splice2 = function (array, start, length, values) {
+  return array.splice.apply(array, [start, length].concat(values))
+}
+
 var state_changes = {
-  stringed_current_item: function (state, sci) {
+  insert: function (state, insert) {
+    var start = insert.start
+    var length = insert.length
+    var values = insert.values
+    var to_stringed_values = insert.to_stringed_values
+
+    splice2(state.current_items, start, length, values)
+    splice2(state.to_stringed_current_items, start, length, _.map(values, to_stringed_one_item))
+  
+  },
+  to_stringed_current_item: function (state, sci) {
     var i = state.current_index
     state.to_stringed_current_items[i] = sci
   },
   current_item: function (state, item) {
     var i = state.current_index
     state.current_items[i] = item
-    state.stringed_current_item = to_stringed_one_item(item, i)
+    state.to_stringed_current_item = to_stringed_one_item(item, i)
   },
   current_index: function (state, i) {
     state._current_item = state.current_items[state.current_index]
-    state._stringed_current_item = state.to_stringed_current_items[i]
+    state._to_stringed_current_item = state.to_stringed_current_items[i]
   },
   clicked_index: function (state, i) {
     if (state.moved) return
@@ -329,9 +385,10 @@ var state = watch_changes(ui_changes, state_changes, {
   clicked_index: null,
   current_item: null,
   current_index: null,
-  stringed_current_item: null,
+  to_stringed_current_item: null,
   action: "pointer",
-  click_action: null
+  click_action: null,
+  insert: []
 })
 
 state.current_index = 0;
